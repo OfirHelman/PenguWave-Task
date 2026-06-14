@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+passlib[bcrypt]
+# passlib 1.7.4 is incompatible with bcrypt 4.1+ (removed __about__, stricter
+# 72-byte check breaks passlib's self-test). Pin to the last compatible release.
+bcrypt<4.1
+pyjwt
