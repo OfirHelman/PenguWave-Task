@@ -346,3 +346,13 @@ def delete_user(user_id: str, authorization: str = Header(default=None)):
         return JSONResponse(status_code=404, content={"error": "User not found"})
 
     return {"message": "User deleted"}
+
+
+# --- Entrypoint -------------------------------------------------------------
+if __name__ == "__main__":
+    import uvicorn
+
+    # Default to port 3001 to match the Base URL in docs/api_contract.md
+    # (http://localhost:3001). Override with the PORT env var if needed.
+    port = int(os.environ.get("PORT", "3001"))
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
