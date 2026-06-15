@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 
 import jwt  # PyJWT
 from fastapi import Body, FastAPI, Header
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from passlib.context import CryptContext
 from pydantic import BaseModel
@@ -13,6 +14,14 @@ from pydantic import BaseModel
 from database import get_connection
 
 app = FastAPI(title="PenguWave API")
+
+# Allow the Vite dev frontend (localhost:5173) to call this API from the browser.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE"],
+    allow_headers=["Authorization", "Content-Type"],
+)
 
 # --- Auth configuration -----------------------------------------------------
 # The signing secret is read from the environment so it never lives in code.
@@ -329,21 +338,41 @@ def update_user(
 
 @app.delete("/api/users/{user_id}")
 def delete_user(user_id: str, authorization: str = Header(default=None)):
-    """Delete a user (admin only)."""
-    _, error = require_admin(authorization)
+    """Delete a user (admin only).
+
+    Safeguards: an admin can't delete their own account, and the last
+    remaining admin can't be deleted.
+    """
+    admin, error = require_admin(authorization)
     if error:
         return error
 
+    # An admin must not delete the account they're currently signed in as.
+    if user_id == admin["id"]:
+        return JSONResponse(
+            status_code=400, content={"error": "You cannot delete your own account"}
+        )
+
+    target = get_user_by_id(user_id)
+    if target is None:
+        return JSONResponse(status_code=404, content={"error": "User not found"})
+
     conn = get_connection()
     try:
-        cur = conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+        # Don't allow removing the only admin — that would lock everyone out.
+        if target["role"] == "admin":
+            admin_count = conn.execute(
+                "SELECT COUNT(*) FROM users WHERE role = 'admin'"
+            ).fetchone()[0]
+            if admin_count <= 1:
+                return JSONResponse(
+                    status_code=400, content={"error": "Cannot delete the last admin"}
+                )
+
+        conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
         conn.commit()
-        deleted = cur.rowcount
     finally:
         conn.close()
-
-    if not deleted:
-        return JSONResponse(status_code=404, content={"error": "User not found"})
 
     return {"message": "User deleted"}
 

@@ -1,5 +1,4 @@
-import { useState } from "react";
-import mockEvents from "../../data/mock_events.json";
+import { useEffect, useState } from "react";
 import { SecurityEvent } from "../types";
 import { sanitizeHtml } from "../utils";
 
@@ -8,7 +7,33 @@ export default function EventsPage() {
   const [severityFilter, setSeverityFilter] = useState("ALL");
   const [selectedEvent, setSelectedEvent] = useState<SecurityEvent | null>(null);
 
-  const events = mockEvents as SecurityEvent[];
+  const [events, setEvents] = useState<SecurityEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+
+    fetch("http://localhost:3001/api/events", {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => {
+        if (res.status === 401) {
+          throw new Error("You are not logged in. Please sign in to view events.");
+        }
+        if (!res.ok) {
+          throw new Error("Failed to load events. Please try again.");
+        }
+        return res.json();
+      })
+      .then((data: SecurityEvent[]) => setEvents(data))
+      .catch((err) =>
+        setError(
+          err instanceof Error ? err.message : "Unable to reach the server."
+        )
+      )
+      .finally(() => setLoading(false));
+  }, []);
 
   const filtered = events.filter((e) => {
     const matchesSearch =
@@ -28,6 +53,9 @@ export default function EventsPage() {
   return (
     <div className="page-container">
       <h1>Security Events</h1>
+
+      {loading && <p style={{ color: "#666" }}>Loading events…</p>}
+      {error && <p style={{ color: "#c0392b" }}>{error}</p>}
 
       <div style={{ marginBottom: 16, display: "flex", gap: 12, alignItems: "center" }}>
         <input

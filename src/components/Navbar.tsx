@@ -6,6 +6,15 @@ interface NavbarProps {
 
 export default function Navbar({ onLoginClick }: NavbarProps) {
   const location = useLocation();
+  const isLoggedIn = !!localStorage.getItem("token");
+
+  const handleLogout = () => {
+    // JWT logout is purely client-side: drop the stored credentials...
+    localStorage.removeItem("token");
+    localStorage.removeItem("role");
+    // ...and reload onto /events, which will show the logged-out prompt.
+    window.location.href = "/events";
+  };
 
   return (
     <nav className="navbar">
@@ -27,9 +36,15 @@ export default function Navbar({ onLoginClick }: NavbarProps) {
         >
           Users
         </Link>
-        <button onClick={onLoginClick} className="navbar-login-btn">
-          Login
-        </button>
+        {isLoggedIn ? (
+          <button onClick={handleLogout} className="navbar-login-btn">
+            Logout
+          </button>
+        ) : (
+          <button onClick={onLoginClick} className="navbar-login-btn">
+            Login
+          </button>
+        )}
       </div>
     </nav>
   );

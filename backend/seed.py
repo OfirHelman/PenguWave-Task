@@ -1,12 +1,12 @@
 """Load events from data/mock_events.json into the SQLite database.
 
 Handles messy records:
-  - Dedupes on (title, sourceIp) so same-content/different-id records are
-    skipped (e.g. evt-002 vs evt-056).
+  - Inserts every event, including content duplicates that have distinct ids
+    (e.g. evt-002 and evt-056 are kept as separate rows).
   - Allows null sourceIp and null userId.
   - Allows empty description.
   - Stores future-dated timestamps (e.g. evt-057) as-is.
-  - Uses INSERT OR IGNORE on id, so re-running won't create duplicates.
+  - Uses INSERT OR IGNORE on id, so re-running won't double-insert.
 
 Run with:  python seed.py
 """
@@ -66,17 +66,10 @@ def seed():
 
     inserted = 0
     skipped = 0
-    seen = set()  # (title, sourceIp) pairs already accepted in this run
 
     conn = get_connection()
     try:
         for ev in events:
-            dedupe_key = (ev.get("title"), ev.get("sourceIp"))
-            if dedupe_key in seen:
-                skipped += 1
-                continue
-            seen.add(dedupe_key)
-
             cur = conn.execute(
                 """
                 INSERT OR IGNORE INTO events
